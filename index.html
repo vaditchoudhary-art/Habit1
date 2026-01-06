@@ -9,60 +9,18 @@ body{
   background:#131a19;
   color:white;
   font-family:Arial,sans-serif;
-  overflow-x:auto;
 }
-
-button{
-  margin:4px;
-  padding:6px 12px;
-}
-
-table{
-  border-collapse:collapse;
-  width:100%;
-  margin-top:10px;
-}
-
-th,td{
-  border:1px solid #444;
-  padding:6px;
-  text-align:center;
-}
-
+button{margin:4px;padding:6px 12px;}
+table{border-collapse:collapse;width:100%;margin-top:10px;}
+th,td{border:1px solid #444;padding:6px;text-align:center;}
 th{background:#222;}
-
 .day:nth-child(even){background:#1f1f1f;}
 .day:nth-child(odd){background:#2b2b2b;}
-
-input[type=text]{
-  width:280px;
-  background:#000;
-  color:white;
-  border:none;
-  padding:4px;
-  font-weight:bold;
-}
-
-input[type=time]{
-  background:#000;
-  color:white;
-  border:none;
-  font-weight:bold;
-}
-
+input[type=text]{width:280px;background:#000;color:white;border:none;font-weight:bold;}
+input[type=time]{background:#000;color:white;border:none;font-weight:bold;}
 .streak{font-weight:bold;}
-
-#report{
-  display:none;
-  margin-top:20px;
-  background:#1e1e1e;
-  padding:12px;
-}
-
-canvas{
-  background:#111;
-  margin-top:10px;
-}
+#report{display:none;margin-top:20px;background:#1e1e1e;padding:12px;}
+canvas{background:#111;margin-top:10px;}
 </style>
 </head>
 
@@ -209,10 +167,10 @@ function loadData(){
 }
 
 function changeDays(d){
+  if(totalDays===d) return;   // ✅ prevent duplicate rebuild
   totalDays=d;
   buildTable();
-  loadData();
-  saveData();
+  loadData();                 // ❌ no save here (IMPORTANT)
 }
 
 function drawPie(done,total){
@@ -234,14 +192,10 @@ function drawPie(done,total){
 function drawBar(done,total){
   const c=document.getElementById("bar"),ctx=c.getContext("2d");
   ctx.clearRect(0,0,c.width,c.height);
-  const max=total;
   ctx.fillStyle="#4caf50";
-  ctx.fillRect(60,180-(done/max)*150,60,(done/max)*150);
+  ctx.fillRect(60,180-(done/total)*150,60,(done/total)*150);
   ctx.fillStyle="#f44336";
-  ctx.fillRect(160,180-((total-done)/max)*150,60,((total-done)/max)*150);
-  ctx.fillStyle="#fff";
-  ctx.fillText("Done",70,195);
-  ctx.fillText("Missed",155,195);
+  ctx.fillRect(160,180-((total-done)/total)*150,60,((total-done)/total)*150);
 }
 
 function checkFinalReport(){
@@ -253,7 +207,7 @@ function checkFinalReport(){
   });
   document.getElementById("report").style.display="block";
   document.getElementById("textReport").innerText=
-    `Completed ${done} out of ${total} (${Math.round(done/total*100)}%)`;
+    `Completed ${done}/${total} (${Math.round(done/total*100)}%)`;
   drawPie(done,total);
   drawBar(done,total);
 }
