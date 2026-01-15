@@ -5,18 +5,47 @@
 <title>Habit Tracker</title>
 
 <style>
-body{background:#131a19;color:white;font-family:Arial;}
-button{margin:4px;padding:6px 12px;}
+:root{
+  --bg:#131a19;
+  --text:#ffffff;
+  --cell1:#1f1f1f;
+  --cell2:#2b2b2b;
+  --accent:#4caf50;
+}
+.light{
+  --bg:#ffffff;
+  --text:#000000;
+  --cell1:#e8f5e9;
+  --cell2:#c8e6c9;
+  --accent:#2e7d32;
+}
+
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:Arial;
+}
+
+button{
+  margin:4px;
+  padding:6px 12px;
+  background:var(--accent);
+  border:none;
+  color:white;
+  font-weight:bold;
+}
+
 table{border-collapse:collapse;width:100%;margin-top:10px;}
-th,td{border:1px solid #444;padding:6px;text-align:center;}
-th{background:#222;}
-.day:nth-child(even){background:#1f1f1f;}
-.day:nth-child(odd){background:#2b2b2b;}
-input[type=text]{width:280px;background:#000;color:white;border:none;font-weight:bold;}
-input[type=time]{background:#000;color:white;border:none;font-weight:bold;}
+th,td{border:1px solid #555;padding:6px;text-align:center;}
+th{background:#333;}
+.day:nth-child(even){background:var(--cell1);}
+.day:nth-child(odd){background:var(--cell2);}
+input[type=text]{width:280px;font-weight:bold;}
 .streak{font-weight:bold;}
-#report{display:none;margin-top:20px;background:#1e1e1e;padding:12px;}
+
+#report{display:none;margin-top:15px;padding:10px;border:2px solid var(--accent);}
 canvas{background:#111;margin-top:10px;}
+.light canvas{background:#fff;}
 </style>
 </head>
 
@@ -27,8 +56,11 @@ canvas{background:#111;margin-top:10px;}
 <button onclick="changeDays(7)">7 Days</button>
 <button onclick="changeDays(15)">15 Days</button>
 <button onclick="changeDays(30)">30 Days</button>
-<button onclick="addRow()">+ Add Task</button>
-<button onclick="removeRow()">− Remove Task</button>
+<button onclick="addRow()">+ Task</button>
+<button onclick="removeRow()">− Task</button>
+<button onclick="toggleMode()">Light / Dark</button>
+<button onclick="resetAll()">Reset All</button>
+<button onclick="exportImage()">Export Report</button>
 
 <table id="tracker"></table>
 
@@ -36,61 +68,54 @@ canvas{background:#111;margin-top:10px;}
   <h3>Final Report</h3>
   <p id="textReport"></p>
   <canvas id="pie" width="260" height="260"></canvas>
-  <canvas id="bar" width="420" height="220"></canvas>
+  <canvas id="bar" width="520" height="240"></canvas>
 </div>
 
 <script>
-let totalDays = 30;
+let totalDays=30;
 
-/* ---------- MONTH RESET ---------- */
-function autoReset(){
-  const now=new Date(), m=localStorage.getItem("month");
-  if(m===null){
-    localStorage.setItem("month",now.getMonth());
-    localStorage.setItem("startDate",now.toISOString());
-    return;
-  }
-  if(+m!==now.getMonth()){
+/* ---------- MODE ---------- */
+function toggleMode(){
+  document.body.classList.toggle("light");
+  localStorage.setItem("mode",document.body.classList.contains("light"));
+}
+if(localStorage.getItem("mode")==="true") document.body.classList.add("light");
+
+/* ---------- RESET ---------- */
+function resetAll(){
+  if(confirm("Reset everything?")){
     localStorage.clear();
-    localStorage.setItem("month",now.getMonth());
-    localStorage.setItem("startDate",now.toISOString());
     location.reload();
   }
 }
 
-/* ---------- START DATE ---------- */
+/* ---------- DATE ---------- */
 function startDate(){
   let d=localStorage.getItem("startDate");
-  if(!d){
-    d=new Date().toISOString();
-    localStorage.setItem("startDate",d);
-  }
+  if(!d){d=new Date().toISOString();localStorage.setItem("startDate",d);}
   return new Date(d);
 }
 
-/* ---------- DAY INDEX (MIDNIGHT BASED) ---------- */
 function todayIndex(){
   const s=startDate();
-  const startMid=new Date(s.getFullYear(),s.getMonth(),s.getDate());
-  const now=new Date();
-  const todayMid=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-  const diff=Math.floor((todayMid-startMid)/(1000*60*60*24));
-  return Math.min(diff+1,totalDays);
+  const a=new Date(s.getFullYear(),s.getMonth(),s.getDate());
+  const b=new Date();
+  const c=new Date(b.getFullYear(),b.getMonth(),b.getDate());
+  return Math.min(Math.floor((c-a)/(86400000))+1,totalDays);
 }
 
 /* ---------- TABLE ---------- */
 function buildTable(){
   tracker.innerHTML="";
-  let h="<tr><th>Time</th><th>Task</th>";
+  let h="<tr><th>Task</th>";
   for(let i=1;i<=totalDays;i++) h+=`<th>Day ${i}</th>`;
   h+="<th>Streak</th></tr>";
   tracker.innerHTML=h;
 }
 
-/* ---------- ROWS ---------- */
 function addRow(save=true){
   const tr=document.createElement("tr");
-  let html=`<td><input type="time"></td><td><input type="text"></td>`;
+  let html=`<td><input type="text"></td>`;
   for(let i=0;i<totalDays;i++) html+=`<td class="day"><input type="checkbox"></td>`;
   html+=`<td class="streak">0</td>`;
   tr.innerHTML=html;
@@ -106,55 +131,39 @@ function removeRow(){
   }
 }
 
-/* ---------- ROW LOGIC ---------- */
-function setupRow(row){
-  const today=todayIndex();
-  row.querySelectorAll(".day input").forEach((cb,i)=>{
-    cb.disabled=(i+1!==today);
-    cb.onchange=()=>{
-      if(cb.checked){
-        cb.disabled=true;
-        updateStreak(row);
-        saveData();
-        checkFinalReport();
-      }
+function setupRow(r){
+  const t=todayIndex();
+  r.querySelectorAll(".day input").forEach((c,i)=>{
+    c.disabled=(i+1!==t);
+    c.onchange=()=>{
+      if(c.checked){c.disabled=true;updateStreak(r);saveData();checkFinal();}
     };
   });
-  row.querySelector("input[type=text]").oninput=saveData;
-  row.querySelector("input[type=time]").onchange=saveData;
+  r.querySelector("input").oninput=saveData;
 }
 
-function updateStreak(row){
+function updateStreak(r){
   let s=0;
-  row.querySelectorAll(".day input").forEach(c=>{if(c.checked)s++;});
-  row.querySelector(".streak").innerText=s;
+  r.querySelectorAll(".day input").forEach(c=>{if(c.checked)s++;});
+  r.querySelector(".streak").innerText=s;
 }
 
 /* ---------- STORAGE ---------- */
 function saveData(){
-  const data={
-    totalDays,
-    rows:[...tracker.rows].slice(1).map(r=>({
-      task:r.querySelector("input[type=text]").value,
-      time:r.querySelector("input[type=time]").value,
-      checks:[...r.querySelectorAll(".day input")].map(c=>c.checked)
-    }))
-  };
-  localStorage.setItem("habitData",JSON.stringify(data));
+  const rows=[...tracker.rows].slice(1).map(r=>({
+    task:r.querySelector("input").value,
+    checks:[...r.querySelectorAll(".day input")].map(c=>c.checked)
+  }));
+  localStorage.setItem("data",JSON.stringify(rows));
 }
 
 function loadData(){
-  const s=localStorage.getItem("habitData");
-  if(!s){
-    for(let i=0;i<5;i++) addRow(false);
-    return;
-  }
-  const d=JSON.parse(s);
-  d.rows.forEach(r=>{
+  const d=JSON.parse(localStorage.getItem("data")||"[]");
+  if(!d.length) for(let i=0;i<5;i++) addRow(false);
+  d.forEach(r=>{
     addRow(false);
     const row=tracker.rows[tracker.rows.length-1];
-    row.querySelector("input[type=text]").value=r.task;
-    row.querySelector("input[type=time]").value=r.time;
+    row.querySelector("input").value=r.task;
     row.querySelectorAll(".day input").forEach((c,i)=>{
       if(r.checks[i]){c.checked=true;c.disabled=true;}
     });
@@ -162,9 +171,8 @@ function loadData(){
   });
 }
 
-/* ---------- DAY BUTTONS ---------- */
+/* ---------- DAYS ---------- */
 function changeDays(d){
-  if(totalDays===d) return;
   totalDays=d;
   buildTable();
   loadData();
@@ -175,44 +183,53 @@ function changeDays(d){
 function drawPie(done,total){
   const ctx=pie.getContext("2d");
   ctx.clearRect(0,0,260,260);
-  const a=(done/total)*Math.PI*2;
+  const ang=done/total*Math.PI*2;
   ctx.fillStyle="#4caf50";
-  ctx.beginPath();ctx.moveTo(130,130);ctx.arc(130,130,100,0,a);ctx.fill();
-  ctx.fillStyle="#555";
-  ctx.beginPath();ctx.moveTo(130,130);ctx.arc(130,130,100,a,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.moveTo(130,130);ctx.arc(130,130,100,0,ang);ctx.fill();
+  ctx.fillStyle="#999";
+  ctx.beginPath();ctx.moveTo(130,130);ctx.arc(130,130,100,ang,Math.PI*2);ctx.fill();
+  pie.onclick=()=>alert(`Completed ${Math.round(done/total*100)}%`);
 }
 
-function drawBarPerTask(rows){
+function drawBars(rows){
   const ctx=bar.getContext("2d");
-  ctx.clearRect(0,0,420,220);
-  const barW=30,gap=15,base=190,maxH=150;
+  ctx.clearRect(0,0,520,240);
   rows.forEach((r,i)=>{
     const pct=r.checks.filter(v=>v).length/totalDays;
-    const h=pct*maxH;
+    const h=pct*150;
     ctx.fillStyle="#4caf50";
-    ctx.fillRect(30+i*(barW+gap),base-h,barW,h);
-    ctx.fillStyle="#fff";
-    ctx.fillText(`T${i+1}`,30+i*(barW+gap),205);
+    ctx.fillRect(40+i*80,190-h,40,h);
+    ctx.fillStyle="#000";
+    ctx.fillText(r.task||`T${i+1}`,35+i*80,210);
   });
 }
 
-/* ---------- FINAL REPORT ---------- */
-function checkFinalReport(){
+function checkFinal(){
   if(todayIndex()!==totalDays) return;
-  const d=JSON.parse(localStorage.getItem("habitData"));
-  let done=0,total=0;
-  d.rows.forEach(r=>r.checks.forEach(v=>{total++;if(v)done++;}));
+  const rows=JSON.parse(localStorage.getItem("data"));
+  let d=0,t=0;
+  rows.forEach(r=>r.checks.forEach(v=>{t++;if(v)d++;}));
   report.style.display="block";
-  textReport.innerText=`Completed ${done}/${total} (${Math.round(done/total*100)}%)`;
-  drawPie(done,total);
-  drawBarPerTask(d.rows);
+  textReport.innerText=`Completed ${d}/${t} (${Math.round(d/t*100)}%)`;
+  drawPie(d,t);
+  drawBars(rows);
+}
+
+/* ---------- EXPORT ---------- */
+function exportImage(){
+  html2canvas(report).then(c=>{
+    const a=document.createElement("a");
+    a.download="habit_report.png";
+    a.href=c.toDataURL();
+    a.click();
+  });
 }
 
 /* ---------- INIT ---------- */
-autoReset();
 buildTable();
 loadData();
 </script>
 
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 </body>
 </html>
